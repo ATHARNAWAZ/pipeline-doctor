@@ -88,12 +88,12 @@ export function useAnalysis() {
           formData.append('run_results', runResultsFile);
         }
 
+        // Don't set Content-Type manually — axios sets it automatically with the
+        // correct multipart boundary when given a FormData object. Overriding it
+        // strips the boundary and breaks the server's multipart parser.
         const analysisResponse = await axios.post<AnalysisResult>(
           '/api/analyze',
-          formData,
-          {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          }
+          formData
         );
 
         const result = analysisResponse.data;
