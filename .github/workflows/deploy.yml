@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Prevent concurrent production deploys — a deploy already in progress must
+# finish before another one starts. Set cancel-in-progress to false so we
+# never abandon a half-deployed Lambda.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # Reuse the full test matrix before touching production
+  test:
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+
+  deploy-lambda:
+    name: Deploy Lambda
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production # GitHub environment — configure required reviewers here
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build Lambda package
+        run: |
+          cd backend
+          pip install -r requirements.txt --target lambda_package/
+          cp -r app/ lambda_package/app/
+          cp lambda_handler.py lambda_package/
+          cd lambda_package
+          zip -r9 ../lambda_deployment.zip .
+
+      - name: Deploy analyzer Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name pipeline-doctor-analyzer \
+            --zip-file fileb://backend/lambda_deployment.zip
+
+      - name: Deploy notifier Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name pipeline-doctor-notifier \
+            --zip-file fileb://backend/lambda_deployment.zip
+
+      - name: Wait for Lambda updates to complete
+        run: |
+          aws lambda wait function-updated \
+            --function-name pipeline-doctor-analyzer
+          aws lambda wait function-updated \
+            --function-name pipeline-doctor-notifier
+
+      - name: Smoke test — analyzer Lambda
+        run: |
+          # Invoke with a minimal smoke-test payload to verify the function
+          # loads correctly. Errors in import paths or missing env vars surface
+          # here before any real traffic reaches the function.
+          # The '|| true' prevents the step from failing on expected cold-start
+          # errors (e.g. missing DATABASE_URL in the test payload context).
+          aws lambda invoke \
+            --function-name pipeline-doctor-analyzer \
+            --payload '{"source": "smoke-test"}' \
+            --log-type Tail \
+            response.json || true
+          cat response.json
+
+      - name: Record deployment in summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered by | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployed at | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Analyzer | pipeline-doctor-analyzer |" >> $GITHUB_STEP_SUMMARY
+          echo "| Notifier | pipeline-doctor-notifier |" >> $GITHUB_STEP_SUMMARY

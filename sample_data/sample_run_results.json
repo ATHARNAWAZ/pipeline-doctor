@@ -1,0 +1,335 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v5/run-results.json",
+    "dbt_version": "1.7.0",
+    "generated_at": "2024-01-15T14:23:45.123456Z",
+    "invocation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "env": {}
+  },
+  "args": {
+    "which": "run",
+    "select": [],
+    "exclude": [],
+    "selector_name": null,
+    "profiles_dir": "/home/runner/.dbt",
+    "project_dir": "/workspace/fintech-pipeline",
+    "target": "prod",
+    "vars": "{}",
+    "threads": 4
+  },
+  "elapsed_time": 47.832,
+  "results": [
+    {
+      "unique_id": "model.fintech_pipeline.stg_transactions",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:00.112233Z",
+          "completed_at": "2024-01-15T14:23:00.445566Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:00.447890Z",
+          "completed_at": "2024-01-15T14:23:02.891234Z"
+        }
+      ],
+      "thread_id": "Thread-1",
+      "execution_time": 2.779,
+      "adapter_response": {
+        "_message": "CREATE VIEW",
+        "code": "CREATE VIEW",
+        "rows_affected": -1
+      },
+      "message": "CREATE VIEW",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.stg_customers",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:00.115000Z",
+          "completed_at": "2024-01-15T14:23:00.389000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:00.391000Z",
+          "completed_at": "2024-01-15T14:23:01.843000Z"
+        }
+      ],
+      "thread_id": "Thread-2",
+      "execution_time": 1.728,
+      "adapter_response": {
+        "_message": "CREATE VIEW",
+        "code": "CREATE VIEW",
+        "rows_affected": -1
+      },
+      "message": "CREATE VIEW",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.stg_products",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:00.118000Z",
+          "completed_at": "2024-01-15T14:23:00.301000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:00.303000Z",
+          "completed_at": "2024-01-15T14:23:00.841000Z"
+        }
+      ],
+      "thread_id": "Thread-3",
+      "execution_time": 0.723,
+      "adapter_response": {
+        "_message": "CREATE TABLE AS",
+        "code": "CREATE TABLE AS",
+        "rows_affected": 47
+      },
+      "message": "CREATE TABLE AS",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.stg_events",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:00.120000Z",
+          "completed_at": "2024-01-15T14:23:00.398000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:00.401000Z",
+          "completed_at": "2024-01-15T14:23:03.214000Z"
+        }
+      ],
+      "thread_id": "Thread-4",
+      "execution_time": 3.094,
+      "adapter_response": {
+        "_message": "INSERT 0 284739",
+        "code": "INSERT",
+        "rows_affected": 284739
+      },
+      "message": "INSERT 0 284739",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.stg_sessions",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:03.300000Z",
+          "completed_at": "2024-01-15T14:23:03.512000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:03.515000Z",
+          "completed_at": "2024-01-15T14:23:05.187000Z"
+        }
+      ],
+      "thread_id": "Thread-1",
+      "execution_time": 1.887,
+      "adapter_response": {
+        "_message": "INSERT 0 91204",
+        "code": "INSERT",
+        "rows_affected": 91204
+      },
+      "message": "INSERT 0 91204",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.int_customer_transactions",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:05.300000Z",
+          "completed_at": "2024-01-15T14:23:05.788000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:05.791000Z",
+          "completed_at": "2024-01-15T14:23:14.022000Z"
+        }
+      ],
+      "thread_id": "Thread-2",
+      "execution_time": 8.722,
+      "adapter_response": {
+        "_message": "INSERT 0 1482931",
+        "code": "INSERT",
+        "rows_affected": 1482931
+      },
+      "message": "INSERT 0 1482931",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.int_product_revenue",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:05.350000Z",
+          "completed_at": "2024-01-15T14:23:05.699000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:05.702000Z",
+          "completed_at": "2024-01-15T14:23:10.411000Z"
+        }
+      ],
+      "thread_id": "Thread-3",
+      "execution_time": 5.061,
+      "adapter_response": {
+        "_message": "INSERT 0 17203",
+        "code": "INSERT",
+        "rows_affected": 17203
+      },
+      "message": "INSERT 0 17203",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.int_user_journey",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:05.380000Z",
+          "completed_at": "2024-01-15T14:23:05.891000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:05.894000Z",
+          "completed_at": "2024-01-15T14:23:12.734000Z"
+        }
+      ],
+      "thread_id": "Thread-4",
+      "execution_time": 7.354,
+      "adapter_response": {
+        "_message": "INSERT 0 648201",
+        "code": "INSERT",
+        "rows_affected": 648201
+      },
+      "message": "INSERT 0 648201",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.mart_customer_ltv",
+      "status": "error",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:14.100000Z",
+          "completed_at": "2024-01-15T14:23:14.512000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:14.515000Z",
+          "completed_at": "2024-01-15T14:23:26.815000Z"
+        }
+      ],
+      "thread_id": "Thread-1",
+      "execution_time": 12.715,
+      "adapter_response": {
+        "_message": "ERROR",
+        "code": "ERROR",
+        "rows_affected": -1
+      },
+      "message": "Database Error in model mart_customer_ltv (models/marts/mart_customer_ltv.sql)\n  Division by zero: customer_lifetime_days is 0 for newly acquired customers\n  compiled code at target/compiled/fintech_pipeline/models/marts/mart_customer_ltv.sql\n  \n  Context: The expression `ca.lifetime_spend_usd / datediff('day', ca.first_transaction_at, current_timestamp)` evaluates to a division by zero when a customer's first_transaction_at equals the current timestamp (i.e., customers who were acquired and transacted for the first time today). This affects 847 newly acquired customers in today's batch.\n  \n  Suggested fix: Wrap the denominator with NULLIF or add a GREATEST(1, ...) guard:\n    ca.lifetime_spend_usd / NULLIF(datediff('day', ca.first_transaction_at, current_timestamp), 0)",
+      "failures": 1,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.mart_revenue_summary",
+      "status": "error",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:14.150000Z",
+          "completed_at": "2024-01-15T14:23:14.601000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:14.604000Z",
+          "completed_at": "2024-01-15T14:23:23.304000Z"
+        }
+      ],
+      "thread_id": "Thread-2",
+      "execution_time": 9.154,
+      "adapter_response": {
+        "_message": "ERROR",
+        "code": "ERROR",
+        "rows_affected": -1
+      },
+      "message": "Database Error in model mart_revenue_summary (models/marts/mart_revenue_summary.sql)\n  Column 'product_category' does not exist in relation 'int_product_revenue'\n  LINE 9:         product_category,\n                  ^\n  HINT: The column 'product_category' was present in stg_products until the schema migration on 2024-01-10, when it was replaced by 'product_type' and 'product_tier'. The int_product_revenue model was updated to remove this column, but mart_revenue_summary still references it in the GROUP BY clause and window function PARTITION BY.\n  \n  compiled code at target/compiled/fintech_pipeline/models/marts/mart_revenue_summary.sql",
+      "failures": 1,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.mart_funnel_analysis",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:14.200000Z",
+          "completed_at": "2024-01-15T14:23:14.689000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:14.692000Z",
+          "completed_at": "2024-01-15T14:23:22.501000Z"
+        }
+      ],
+      "thread_id": "Thread-3",
+      "execution_time": 8.301,
+      "adapter_response": {
+        "_message": "CREATE TABLE AS",
+        "code": "CREATE TABLE AS",
+        "rows_affected": 4820
+      },
+      "message": "CREATE TABLE AS",
+      "failures": null,
+      "batch_results": null
+    },
+    {
+      "unique_id": "model.fintech_pipeline.mart_daily_metrics",
+      "status": "success",
+      "timing": [
+        {
+          "name": "compile",
+          "started_at": "2024-01-15T14:23:14.250000Z",
+          "completed_at": "2024-01-15T14:23:14.731000Z"
+        },
+        {
+          "name": "execute",
+          "started_at": "2024-01-15T14:23:14.734000Z",
+          "completed_at": "2024-01-15T14:23:20.524000Z"
+        }
+      ],
+      "thread_id": "Thread-4",
+      "execution_time": 6.274,
+      "adapter_response": {
+        "_message": "CREATE TABLE AS",
+        "code": "CREATE TABLE AS",
+        "rows_affected": 365
+      },
+      "message": "CREATE TABLE AS",
+      "failures": null,
+      "batch_results": null
+    }
+  ]
+}

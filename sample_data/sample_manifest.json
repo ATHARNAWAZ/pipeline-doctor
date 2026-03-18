@@ -1,0 +1,1289 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v10/manifest.json",
+    "dbt_version": "1.7.0",
+    "generated_at": "2024-01-15T14:23:45.123456Z",
+    "invocation_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "env": {}
+  },
+  "nodes": {
+    "model.fintech_pipeline.stg_transactions": {
+      "unique_id": "model.fintech_pipeline.stg_transactions",
+      "fqn": ["fintech_pipeline", "staging", "stg_transactions"],
+      "database": "analytics",
+      "schema": "staging",
+      "name": "stg_transactions",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/stg_transactions.sql",
+      "path": "staging/stg_transactions.sql",
+      "alias": "stg_transactions",
+      "checksum": {"name": "sha256", "checksum": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"},
+      "description": "Staged payment transactions from the raw payments processor. Casts data types, standardizes currency to USD, and filters out test/sandbox transactions.",
+      "columns": {
+        "transaction_id": {
+          "name": "transaction_id",
+          "description": "Globally unique transaction identifier from the payments processor. UUID format.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Foreign key to stg_customers. Internal customer identifier.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "amount_usd": {
+          "name": "amount_usd",
+          "description": "Transaction amount converted to USD using the exchange rate at transaction time.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "merchant_category_code": {
+          "name": "merchant_category_code",
+          "description": "ISO 18245 merchant category code (MCC). Used for spend categorization.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "transaction_status": {
+          "name": "transaction_status",
+          "description": "Final settlement status: completed, declined, refunded, or chargeback.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "transacted_at": {
+          "name": "transacted_at",
+          "description": "Timestamp of when the transaction was authorized, in UTC.",
+          "data_type": "timestamp",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "view",
+        "schema": "staging",
+        "tags": ["staging", "transactions", "daily"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": ["source.fintech_pipeline.raw.raw_transactions"]
+      },
+      "refs": [],
+      "sources": [["raw", "raw_transactions"]],
+      "metrics": [],
+      "raw_code": "with source as (\n    select * from {{ source('raw', 'raw_transactions') }}\n),\n\ncleaned as (\n    select\n        transaction_id::varchar                                         as transaction_id,\n        customer_id::varchar                                            as customer_id,\n        product_id::varchar                                             as product_id,\n        -- Normalize all amounts to USD at time of transaction\n        case\n            when currency_code = 'USD' then amount\n            else amount * exchange_rate_to_usd\n        end::numeric(18, 4)                                             as amount_usd,\n        currency_code::varchar(3)                                       as original_currency,\n        amount::numeric(18, 4)                                          as original_amount,\n        merchant_id::varchar                                            as merchant_id,\n        merchant_name::varchar                                          as merchant_name,\n        merchant_category_code::varchar(4)                              as merchant_category_code,\n        payment_method::varchar                                         as payment_method,\n        transaction_status::varchar                                     as transaction_status,\n        failure_reason::varchar                                         as failure_reason,\n        is_international::boolean                                       as is_international,\n        processor_response_code::varchar                                as processor_response_code,\n        transacted_at::timestamp                                        as transacted_at,\n        settled_at::timestamp                                           as settled_at,\n        _fivetran_synced::timestamp                                     as _loaded_at\n    from source\n    -- Exclude sandbox/test transactions that leak into production\n    where transaction_id not like 'TEST_%'\n      and transaction_id not like 'SANDBOX_%'\n      and customer_id is not null\n      and amount > 0\n)\n\nselect * from cleaned",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["staging", "transactions", "daily"]
+    },
+
+    "model.fintech_pipeline.stg_customers": {
+      "unique_id": "model.fintech_pipeline.stg_customers",
+      "fqn": ["fintech_pipeline", "staging", "stg_customers"],
+      "database": "analytics",
+      "schema": "staging",
+      "name": "stg_customers",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/stg_customers.sql",
+      "path": "staging/stg_customers.sql",
+      "alias": "stg_customers",
+      "checksum": {"name": "sha256", "checksum": "b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567b"},
+      "description": "Staged customer profiles from the CRM. Deduplicated on customer_id (taking the most recent record), PII fields hashed for compliance.",
+      "columns": {
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Surrogate key for the customer. Stable across CRM updates.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "customer_segment": {
+          "name": "customer_segment",
+          "description": "Marketing segment: retail, sme, enterprise, or premium_retail.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "kyc_status": {
+          "name": "kyc_status",
+          "description": "Know Your Customer verification status: pending, verified, rejected, or expired.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "acquisition_channel": {
+          "name": "acquisition_channel",
+          "description": "How the customer was acquired: organic, paid_search, referral, partner, or app_store.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "first_transaction_date": {
+          "name": "first_transaction_date",
+          "description": "Date of the customer's first completed transaction. NULL for customers who registered but never transacted.",
+          "data_type": "date",
+          "meta": {}
+        },
+        "customer_created_at": {
+          "name": "customer_created_at",
+          "description": "Timestamp when the customer account was created in the CRM.",
+          "data_type": "timestamp",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "view",
+        "schema": "staging",
+        "tags": ["staging", "customers", "daily"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": ["source.fintech_pipeline.raw.raw_customers"]
+      },
+      "refs": [],
+      "sources": [["raw", "raw_customers"]],
+      "metrics": [],
+      "raw_code": "with source as (\n    select * from {{ source('raw', 'raw_customers') }}\n),\n\n-- Deduplicate: CRM sometimes sends multiple records per customer on schema changes\ndeduped as (\n    select *,\n        row_number() over (\n            partition by customer_id\n            order by updated_at desc\n        ) as rn\n    from source\n),\n\ncleaned as (\n    select\n        customer_id::varchar                                            as customer_id,\n        -- Hash PII fields for GDPR/CCPA compliance\n        md5(lower(trim(email)))::varchar                                as email_hash,\n        md5(lower(trim(full_name)))::varchar                            as name_hash,\n        customer_segment::varchar                                       as customer_segment,\n        country_code::varchar(2)                                        as country_code,\n        kyc_status::varchar                                             as kyc_status,\n        kyc_verified_at::timestamp                                      as kyc_verified_at,\n        risk_tier::varchar                                              as risk_tier,\n        acquisition_channel::varchar                                    as acquisition_channel,\n        referrer_customer_id::varchar                                   as referrer_customer_id,\n        first_transaction_date::date                                    as first_transaction_date,\n        is_business_account::boolean                                    as is_business_account,\n        credit_limit_usd::numeric(18, 2)                                as credit_limit_usd,\n        customer_created_at::timestamp                                  as customer_created_at,\n        updated_at::timestamp                                           as updated_at,\n        _fivetran_synced::timestamp                                     as _loaded_at\n    from deduped\n    where rn = 1\n      and customer_id is not null\n)\n\nselect * from cleaned",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["staging", "customers", "daily"]
+    },
+
+    "model.fintech_pipeline.stg_products": {
+      "unique_id": "model.fintech_pipeline.stg_products",
+      "fqn": ["fintech_pipeline", "staging", "stg_products"],
+      "database": "analytics",
+      "schema": "staging",
+      "name": "stg_products",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/stg_products.sql",
+      "path": "staging/stg_products.sql",
+      "alias": "stg_products",
+      "checksum": {"name": "sha256", "checksum": "c3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567c3d"},
+      "description": "Staged product catalog from the core banking system. Products include debit cards, credit lines, savings accounts, and FX wallets.",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "description": "Unique product identifier from the core banking product registry.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "product_name": {
+          "name": "product_name",
+          "description": "Human-readable product name (e.g., 'Visa Debit Standard', 'Flex Credit Line 5000').",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "product_type": {
+          "name": "product_type",
+          "description": "Product classification: debit_card, credit_line, savings_account, fx_wallet, or crypto_wallet.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "product_tier": {
+          "name": "product_tier",
+          "description": "Pricing tier: free, standard, premium, or enterprise.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "monthly_fee_usd": {
+          "name": "monthly_fee_usd",
+          "description": "Monthly subscription fee in USD. Zero for free-tier products.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "is_active": {
+          "name": "is_active",
+          "description": "Whether the product is currently available for new customer enrollments.",
+          "data_type": "boolean",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "table",
+        "schema": "staging",
+        "tags": ["staging", "products", "weekly"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": ["source.fintech_pipeline.raw.raw_products"]
+      },
+      "refs": [],
+      "sources": [["raw", "raw_products"]],
+      "metrics": [],
+      "raw_code": "with source as (\n    select * from {{ source('raw', 'raw_products') }}\n),\n\ncleaned as (\n    select\n        product_id::varchar                                             as product_id,\n        product_name::varchar                                           as product_name,\n        product_type::varchar                                           as product_type,\n        product_tier::varchar                                           as product_tier,\n        product_category::varchar                                       as product_category,\n        interchange_rate::numeric(6, 5)                                 as interchange_rate,\n        monthly_fee_usd::numeric(10, 2)                                 as monthly_fee_usd,\n        annual_fee_usd::numeric(10, 2)                                  as annual_fee_usd,\n        credit_apr::numeric(6, 4)                                       as credit_apr,\n        cashback_rate::numeric(6, 5)                                    as cashback_rate,\n        is_active::boolean                                              as is_active,\n        launched_at::date                                               as launched_at,\n        deprecated_at::date                                             as deprecated_at,\n        _fivetran_synced::timestamp                                     as _loaded_at\n    from source\n    where product_id is not null\n)\n\nselect * from cleaned",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["staging", "products", "weekly"]
+    },
+
+    "model.fintech_pipeline.stg_events": {
+      "unique_id": "model.fintech_pipeline.stg_events",
+      "fqn": ["fintech_pipeline", "staging", "stg_events"],
+      "database": "analytics",
+      "schema": "staging",
+      "name": "stg_events",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/stg_events.sql",
+      "path": "staging/stg_events.sql",
+      "alias": "stg_events",
+      "checksum": {"name": "sha256", "checksum": "d4e5f6789012345678901234567890abcdef1234567890abcdef1234567d4e5f"},
+      "description": "Staged user behavior events from the mobile and web apps (Segment track calls). Parses event properties from JSONB and filters bot traffic.",
+      "columns": {
+        "event_id": {
+          "name": "event_id",
+          "description": "Unique event identifier generated by Segment. UUID format.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "anonymous_id": {
+          "name": "anonymous_id",
+          "description": "Pre-authentication identifier. Used to stitch sessions for unauthenticated users.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Post-authentication customer identifier. NULL for unauthenticated events.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "event_name": {
+          "name": "event_name",
+          "description": "Segment track event name (e.g., 'Payment Initiated', 'KYC Step Completed', 'Card Activated').",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "platform": {
+          "name": "platform",
+          "description": "Client platform: ios, android, or web.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "description": "Client-side timestamp when the event occurred, in UTC.",
+          "data_type": "timestamp",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "incremental",
+        "schema": "staging",
+        "tags": ["staging", "events", "hourly"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": ["source.fintech_pipeline.raw.raw_events"]
+      },
+      "refs": [],
+      "sources": [["raw", "raw_events"]],
+      "metrics": [],
+      "raw_code": "with source as (\n    select * from {{ source('raw', 'raw_events') }}\n    {% if is_incremental() %}\n    where received_at > (select max(occurred_at) from {{ this }})\n    {% endif %}\n),\n\ncleaned as (\n    select\n        event_id::varchar                                               as event_id,\n        anonymous_id::varchar                                           as anonymous_id,\n        -- customer_id is null before authentication\n        nullif(user_id, '')::varchar                                    as customer_id,\n        session_id::varchar                                             as session_id,\n        event_name::varchar                                             as event_name,\n        -- Extract key properties from Segment JSONB payload\n        (properties ->> 'screen_name')::varchar                        as screen_name,\n        (properties ->> 'product_id')::varchar                         as product_id,\n        (properties ->> 'amount')::numeric(18, 4)                      as event_amount,\n        (properties ->> 'error_code')::varchar                         as error_code,\n        (properties ->> 'experiment_variant')::varchar                 as experiment_variant,\n        platform::varchar                                               as platform,\n        device_type::varchar                                            as device_type,\n        app_version::varchar                                            as app_version,\n        ip_address_hash::varchar                                        as ip_address_hash,\n        occurred_at::timestamp                                          as occurred_at,\n        received_at::timestamp                                          as received_at,\n        _fivetran_synced::timestamp                                     as _loaded_at\n    from source\n    -- Filter known bot user agents and internal Segment test events\n    where event_id not like 'segment-test-%'\n      and coalesce(context_ip, '') not in (\n          select ip_address_hash from {{ ref('int_blocked_ips') }}\n          -- Note: int_blocked_ips not yet modeled, using hardcoded fallback\n      ) or context_ip is null\n)\n\nselect * from cleaned",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["staging", "events", "hourly"]
+    },
+
+    "model.fintech_pipeline.stg_sessions": {
+      "unique_id": "model.fintech_pipeline.stg_sessions",
+      "fqn": ["fintech_pipeline", "staging", "stg_sessions"],
+      "database": "analytics",
+      "schema": "staging",
+      "name": "stg_sessions",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/stg_sessions.sql",
+      "path": "staging/stg_sessions.sql",
+      "alias": "stg_sessions",
+      "checksum": {"name": "sha256", "checksum": "e5f6789012345678901234567890abcdef1234567890abcdef1234567e5f6789"},
+      "description": "Staged web and mobile sessions from Segment page calls and session tracking. Each row is one session with aggregated page view counts and duration.",
+      "columns": {
+        "session_id": {
+          "name": "session_id",
+          "description": "Unique session identifier. Composed of anonymous_id + session start timestamp.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "anonymous_id": {
+          "name": "anonymous_id",
+          "description": "Pre-authentication device/browser identifier from Segment.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Customer identifier if user authenticated during this session. NULL for anonymous sessions.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "session_duration_seconds": {
+          "name": "session_duration_seconds",
+          "description": "Total session duration in seconds from first to last event.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "page_view_count": {
+          "name": "page_view_count",
+          "description": "Number of distinct pages viewed in this session.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "session_started_at": {
+          "name": "session_started_at",
+          "description": "Timestamp of the first event in this session, in UTC.",
+          "data_type": "timestamp",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "incremental",
+        "schema": "staging",
+        "tags": ["staging", "sessions", "hourly"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": ["source.fintech_pipeline.raw.raw_sessions"]
+      },
+      "refs": [],
+      "sources": [["raw", "raw_sessions"]],
+      "metrics": [],
+      "raw_code": "with source as (\n    select * from {{ source('raw', 'raw_sessions') }}\n    {% if is_incremental() %}\n    where session_started_at > (select max(session_started_at) from {{ this }})\n    {% endif %}\n),\n\ncleaned as (\n    select\n        session_id::varchar                                             as session_id,\n        anonymous_id::varchar                                           as anonymous_id,\n        nullif(user_id, '')::varchar                                    as customer_id,\n        utm_source::varchar                                             as utm_source,\n        utm_medium::varchar                                             as utm_medium,\n        utm_campaign::varchar                                           as utm_campaign,\n        referrer_domain::varchar                                        as referrer_domain,\n        landing_page::varchar                                           as landing_page,\n        exit_page::varchar                                              as exit_page,\n        platform::varchar                                               as platform,\n        device_type::varchar                                            as device_type,\n        browser::varchar                                                as browser,\n        country_code::varchar(2)                                        as country_code,\n        page_view_count::integer                                        as page_view_count,\n        event_count::integer                                            as event_count,\n        session_duration_seconds::integer                               as session_duration_seconds,\n        did_convert::boolean                                            as did_convert,\n        conversion_event::varchar                                       as conversion_event,\n        session_started_at::timestamp                                   as session_started_at,\n        session_ended_at::timestamp                                     as session_ended_at,\n        _fivetran_synced::timestamp                                     as _loaded_at\n    from source\n    where session_id is not null\n      and session_duration_seconds >= 0\n)\n\nselect * from cleaned",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["staging", "sessions", "hourly"]
+    },
+
+    "model.fintech_pipeline.int_customer_transactions": {
+      "unique_id": "model.fintech_pipeline.int_customer_transactions",
+      "fqn": ["fintech_pipeline", "intermediate", "int_customer_transactions"],
+      "database": "analytics",
+      "schema": "intermediate",
+      "name": "int_customer_transactions",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/intermediate/int_customer_transactions.sql",
+      "path": "intermediate/int_customer_transactions.sql",
+      "alias": "int_customer_transactions",
+      "checksum": {"name": "sha256", "checksum": "f6789012345678901234567890abcdef1234567890abcdef1234567f67890123"},
+      "description": "Customer-transaction grain intermediate model. Joins staged transactions with customer profiles and computes per-customer running totals and behavioral flags used in LTV and risk models.",
+      "columns": {
+        "transaction_id": {
+          "name": "transaction_id",
+          "description": "Primary key. Unique transaction identifier.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Foreign key to stg_customers.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "amount_usd": {
+          "name": "amount_usd",
+          "description": "Transaction amount in USD.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "customer_lifetime_spend_usd": {
+          "name": "customer_lifetime_spend_usd",
+          "description": "Running total of all completed transaction amounts for this customer up to and including this transaction.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "customer_transaction_sequence": {
+          "name": "customer_transaction_sequence",
+          "description": "Sequential transaction number for this customer (1 = first transaction).",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "days_since_last_transaction": {
+          "name": "days_since_last_transaction",
+          "description": "Days elapsed since the customer's previous transaction. NULL for the first transaction.",
+          "data_type": "integer",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "incremental",
+        "schema": "intermediate",
+        "tags": ["intermediate", "transactions", "customers", "daily"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.stg_transactions",
+          "model.fintech_pipeline.stg_customers"
+        ]
+      },
+      "refs": [["stg_transactions"], ["stg_customers"]],
+      "sources": [],
+      "metrics": [],
+      "raw_code": "with transactions as (\n    select * from {{ ref('stg_transactions') }}\n    {% if is_incremental() %}\n    where transacted_at > (select max(transacted_at) from {{ this }})\n    {% endif %}\n),\n\ncustomers as (\n    select * from {{ ref('stg_customers') }}\n),\n\njoined as (\n    select\n        t.transaction_id,\n        t.customer_id,\n        t.product_id,\n        t.amount_usd,\n        t.original_currency,\n        t.original_amount,\n        t.merchant_id,\n        t.merchant_name,\n        t.merchant_category_code,\n        t.payment_method,\n        t.transaction_status,\n        t.failure_reason,\n        t.is_international,\n        t.transacted_at,\n        t.settled_at,\n        -- Customer attributes at time of transaction\n        c.customer_segment,\n        c.country_code,\n        c.kyc_status,\n        c.risk_tier,\n        c.acquisition_channel,\n        c.is_business_account,\n        c.credit_limit_usd\n    from transactions t\n    inner join customers c\n        on t.customer_id = c.customer_id\n    where t.transaction_status = 'completed'\n),\n\nwith_window_functions as (\n    select\n        *,\n        -- Running spend using window function\n        sum(amount_usd) over (\n            partition by customer_id\n            order by transacted_at\n            rows between unbounded preceding and current row\n        )                                                               as customer_lifetime_spend_usd,\n        -- Transaction sequence number per customer\n        row_number() over (\n            partition by customer_id\n            order by transacted_at\n        )                                                               as customer_transaction_sequence,\n        -- Days since last transaction (NULL for first)\n        datediff(\n            'day',\n            lag(transacted_at) over (\n                partition by customer_id\n                order by transacted_at\n            ),\n            transacted_at\n        )                                                               as days_since_last_transaction,\n        -- 30-day rolling spend for velocity checks\n        sum(amount_usd) over (\n            partition by customer_id\n            order by transacted_at\n            range between interval '30 days' preceding and current row\n        )                                                               as rolling_30d_spend_usd\n    from joined\n)\n\nselect * from with_window_functions",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["intermediate", "transactions", "customers", "daily"]
+    },
+
+    "model.fintech_pipeline.int_product_revenue": {
+      "unique_id": "model.fintech_pipeline.int_product_revenue",
+      "fqn": ["fintech_pipeline", "intermediate", "int_product_revenue"],
+      "database": "analytics",
+      "schema": "intermediate",
+      "name": "int_product_revenue",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/intermediate/int_product_revenue.sql",
+      "path": "intermediate/int_product_revenue.sql",
+      "alias": "int_product_revenue",
+      "checksum": {"name": "sha256", "checksum": "789012345678901234567890abcdef1234567890abcdef12345678901234567890"},
+      "description": "Product-daily revenue intermediate model. Aggregates transaction revenue by product, computing interchange income, subscription fees, and FX spread revenue per day.",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "description": "Product identifier. Composite key with transaction_date.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "transaction_date": {
+          "name": "transaction_date",
+          "description": "Calendar date of the aggregated transactions. Composite key with product_id.",
+          "data_type": "date",
+          "meta": {}
+        },
+        "product_type": {
+          "name": "product_type",
+          "description": "Product classification from stg_products.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "gross_transaction_volume_usd": {
+          "name": "gross_transaction_volume_usd",
+          "description": "Total transaction volume (sum of amount_usd) for this product on this date.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "interchange_revenue_usd": {
+          "name": "interchange_revenue_usd",
+          "description": "Interchange income earned: gross_transaction_volume * product interchange_rate.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "transaction_count": {
+          "name": "transaction_count",
+          "description": "Number of completed transactions for this product on this date.",
+          "data_type": "integer",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "incremental",
+        "schema": "intermediate",
+        "tags": ["intermediate", "revenue", "products", "daily"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.stg_transactions",
+          "model.fintech_pipeline.stg_products"
+        ]
+      },
+      "refs": [["stg_transactions"], ["stg_products"]],
+      "sources": [],
+      "metrics": [],
+      "raw_code": "with transactions as (\n    select * from {{ ref('stg_transactions') }}\n    where transaction_status = 'completed'\n    {% if is_incremental() %}\n    and transacted_at::date > (select max(transaction_date) from {{ this }})\n    {% endif %}\n),\n\nproducts as (\n    select * from {{ ref('stg_products') }}\n),\n\naggregated as (\n    select\n        t.product_id,\n        t.transacted_at::date                                           as transaction_date,\n        p.product_name,\n        p.product_type,\n        p.product_tier,\n        -- NOTE: product_category column referenced here comes from stg_products\n        -- This column was deprecated in products v2 schema migration on 2024-01-10\n        p.product_category,\n        p.interchange_rate,\n        count(t.transaction_id)                                         as transaction_count,\n        count(distinct t.customer_id)                                   as unique_customers,\n        sum(t.amount_usd)                                               as gross_transaction_volume_usd,\n        -- Interchange revenue: volume * interchange rate (typically 0.2-1.5%)\n        sum(t.amount_usd) * p.interchange_rate                         as interchange_revenue_usd,\n        sum(case when t.is_international then t.amount_usd * 0.015 else 0 end)\n                                                                        as fx_spread_revenue_usd,\n        count(case when t.transaction_status = 'declined' then 1 end)   as decline_count,\n        count(case when t.transaction_status = 'chargeback' then 1 end) as chargeback_count,\n        sum(case when t.transaction_status = 'refunded' then t.amount_usd else 0 end)\n                                                                        as refund_volume_usd\n    from transactions t\n    inner join products p\n        on t.product_id = p.product_id\n    group by 1, 2, 3, 4, 5, 6, 7\n)\n\nselect * from aggregated",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["intermediate", "revenue", "products", "daily"]
+    },
+
+    "model.fintech_pipeline.int_user_journey": {
+      "unique_id": "model.fintech_pipeline.int_user_journey",
+      "fqn": ["fintech_pipeline", "intermediate", "int_user_journey"],
+      "database": "analytics",
+      "schema": "intermediate",
+      "name": "int_user_journey",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/intermediate/int_user_journey.sql",
+      "path": "intermediate/int_user_journey.sql",
+      "alias": "int_user_journey",
+      "checksum": {"name": "sha256", "checksum": "90123456789012345678901234567890abcdef1234567890abcdef12345678901"},
+      "description": "User journey intermediate model that stitches together behavioral events and sessions with customer profiles to build activation and funnel metrics. One row per customer per day.",
+      "columns": {
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Customer identifier. Composite key with activity_date.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "activity_date": {
+          "name": "activity_date",
+          "description": "Calendar date. Composite key with customer_id.",
+          "data_type": "date",
+          "meta": {}
+        },
+        "session_count": {
+          "name": "session_count",
+          "description": "Number of distinct sessions this customer had on this date.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "total_session_duration_seconds": {
+          "name": "total_session_duration_seconds",
+          "description": "Total time in app/web across all sessions on this date.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "key_events_completed": {
+          "name": "key_events_completed",
+          "description": "Array of distinct funnel event names completed on this date (e.g., Payment Initiated, KYC Step Completed).",
+          "data_type": "array",
+          "meta": {}
+        },
+        "did_transact": {
+          "name": "did_transact",
+          "description": "Whether the customer completed at least one transaction on this date.",
+          "data_type": "boolean",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "incremental",
+        "schema": "intermediate",
+        "tags": ["intermediate", "funnel", "daily"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.stg_events",
+          "model.fintech_pipeline.stg_sessions",
+          "model.fintech_pipeline.stg_customers"
+        ]
+      },
+      "refs": [["stg_events"], ["stg_sessions"], ["stg_customers"]],
+      "sources": [],
+      "metrics": [],
+      "raw_code": "with events as (\n    select * from {{ ref('stg_events') }}\n    where customer_id is not null\n    {% if is_incremental() %}\n    and occurred_at::date > (select max(activity_date) from {{ this }})\n    {% endif %}\n),\n\nsessions as (\n    select * from {{ ref('stg_sessions') }}\n    where customer_id is not null\n    {% if is_incremental() %}\n    and session_started_at::date > (select max(activity_date) from {{ this }})\n    {% endif %}\n),\n\ncustomers as (\n    select * from {{ ref('stg_customers') }}\n),\n\n-- Aggregate events to customer-day grain\nevent_summary as (\n    select\n        customer_id,\n        occurred_at::date                                               as activity_date,\n        count(distinct event_id)                                        as total_event_count,\n        count(distinct session_id)                                      as session_count_from_events,\n        -- Capture funnel milestone events\n        array_agg(distinct event_name)\n            filter (where event_name in (\n                'KYC Step Completed', 'Card Activated', 'Payment Initiated',\n                'Payment Completed', 'Direct Deposit Connected', 'Credit Applied',\n                'Referral Sent', 'Savings Goal Created'\n            ))                                                          as key_events_completed,\n        max(case when event_name = 'Payment Completed' then 1 else 0 end)::boolean\n                                                                        as did_transact,\n        count(distinct experiment_variant)\n            filter (where experiment_variant is not null)               as experiments_active\n    from events\n    group by 1, 2\n),\n\n-- Aggregate sessions to customer-day grain\nsession_summary as (\n    select\n        customer_id,\n        session_started_at::date                                        as activity_date,\n        count(distinct session_id)                                      as session_count,\n        sum(session_duration_seconds)                                   as total_session_duration_seconds,\n        sum(page_view_count)                                            as total_page_views,\n        max(case when did_convert then 1 else 0 end)::boolean           as had_conversion_session\n    from sessions\n    group by 1, 2\n),\n\ncombined as (\n    select\n        coalesce(e.customer_id, s.customer_id)                         as customer_id,\n        coalesce(e.activity_date, s.activity_date)                     as activity_date,\n        coalesce(s.session_count, 0)                                   as session_count,\n        coalesce(s.total_session_duration_seconds, 0)                  as total_session_duration_seconds,\n        coalesce(s.total_page_views, 0)                                 as total_page_views,\n        coalesce(e.total_event_count, 0)                                as total_event_count,\n        coalesce(e.key_events_completed, array[]::varchar[])            as key_events_completed,\n        coalesce(e.did_transact, false)                                 as did_transact,\n        coalesce(s.had_conversion_session, false)                       as had_conversion_session,\n        coalesce(e.experiments_active, 0)                               as experiments_active\n    from event_summary e\n    full outer join session_summary s\n        on e.customer_id = s.customer_id\n        and e.activity_date = s.activity_date\n),\n\nwith_customer_attrs as (\n    select\n        c.*,\n        cust.customer_segment,\n        cust.country_code,\n        cust.acquisition_channel,\n        cust.risk_tier,\n        cust.is_business_account\n    from combined c\n    inner join customers cust on c.customer_id = cust.customer_id\n)\n\nselect * from with_customer_attrs",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["intermediate", "funnel", "daily"]
+    },
+
+    "model.fintech_pipeline.mart_customer_ltv": {
+      "unique_id": "model.fintech_pipeline.mart_customer_ltv",
+      "fqn": ["fintech_pipeline", "marts", "mart_customer_ltv"],
+      "database": "analytics",
+      "schema": "marts",
+      "name": "mart_customer_ltv",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/marts/mart_customer_ltv.sql",
+      "path": "marts/mart_customer_ltv.sql",
+      "alias": "mart_customer_ltv",
+      "checksum": {"name": "sha256", "checksum": "a123456789012345678901234567890abcdef1234567890abcdef123456789012"},
+      "description": "Customer lifetime value mart. One row per customer with LTV score, predicted 12-month revenue, churn risk tier, and engagement metrics. Primary source for the Revenue Dashboard customer segment drilldown.",
+      "columns": {
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Primary key. Unique customer identifier.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "lifetime_spend_usd": {
+          "name": "lifetime_spend_usd",
+          "description": "Total amount the customer has spent across all completed transactions.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "lifetime_transaction_count": {
+          "name": "lifetime_transaction_count",
+          "description": "Total number of completed transactions by this customer.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "avg_transaction_value_usd": {
+          "name": "avg_transaction_value_usd",
+          "description": "Mean transaction value in USD (lifetime_spend_usd / lifetime_transaction_count).",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "predicted_annual_revenue_usd": {
+          "name": "predicted_annual_revenue_usd",
+          "description": "Projected revenue for the next 12 months based on transaction velocity and interchange rate.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "ltv_tier": {
+          "name": "ltv_tier",
+          "description": "LTV quintile classification: platinum, gold, silver, bronze, or dormant.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "churn_risk_score": {
+          "name": "churn_risk_score",
+          "description": "0-100 churn risk score. Higher = more likely to churn in next 90 days.",
+          "data_type": "numeric",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "table",
+        "schema": "marts",
+        "tags": ["mart", "customers", "ltv", "daily"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.int_customer_transactions",
+          "model.fintech_pipeline.stg_customers"
+        ]
+      },
+      "refs": [["int_customer_transactions"], ["stg_customers"]],
+      "sources": [],
+      "metrics": [],
+      "raw_code": "with customer_transactions as (\n    select * from {{ ref('int_customer_transactions') }}\n),\n\ncustomers as (\n    select * from {{ ref('stg_customers') }}\n),\n\n-- Aggregate to customer grain\ncustomer_aggregates as (\n    select\n        customer_id,\n        count(transaction_id)                                           as lifetime_transaction_count,\n        sum(amount_usd)                                                 as lifetime_spend_usd,\n        avg(amount_usd)                                                 as avg_transaction_value_usd,\n        min(transacted_at)                                              as first_transaction_at,\n        max(transacted_at)                                              as last_transaction_at,\n        count(distinct merchant_category_code)                          as distinct_mcc_count,\n        count(distinct date_trunc('month', transacted_at))              as active_months_count,\n        sum(case when is_international then amount_usd else 0 end)      as international_spend_usd,\n        avg(days_since_last_transaction)                                as avg_days_between_transactions\n    from customer_transactions\n    group by 1\n),\n\n-- Compute LTV metrics. NOTE: Division below will fail when customer_lifetime_days = 0\n-- This happens for customers who transacted on the same day they registered (newly acquired)\nltv_computed as (\n    select\n        ca.*,\n        c.customer_segment,\n        c.acquisition_channel,\n        c.country_code,\n        c.risk_tier,\n        c.is_business_account,\n        c.credit_limit_usd,\n        c.customer_created_at,\n        -- Lifetime days since first transaction\n        datediff('day', ca.first_transaction_at, current_timestamp)     as customer_lifetime_days,\n        -- Daily transaction velocity (WILL RAISE DIV/ZERO for same-day customers)\n        ca.lifetime_spend_usd / datediff('day', ca.first_transaction_at, current_timestamp)\n                                                                        as daily_spend_velocity_usd,\n        -- Projected annual revenue from interchange (assumes 0.8% blended rate)\n        (ca.lifetime_spend_usd / datediff('day', ca.first_transaction_at, current_timestamp))\n            * 365 * 0.008                                               as predicted_annual_revenue_usd\n    from customer_aggregates ca\n    inner join customers c on ca.customer_id = c.customer_id\n),\n\nwith_tiers as (\n    select\n        *,\n        -- Churn risk: high if avg_days_between_transactions > 60\n        case\n            when last_transaction_at < current_date - interval '90 days' then 90\n            when last_transaction_at < current_date - interval '60 days' then 70\n            when avg_days_between_transactions > 45 then 50\n            when avg_days_between_transactions > 30 then 30\n            else 10\n        end                                                             as churn_risk_score,\n        -- LTV quintile tier\n        case\n            when predicted_annual_revenue_usd >= 500 then 'platinum'\n            when predicted_annual_revenue_usd >= 200 then 'gold'\n            when predicted_annual_revenue_usd >= 75 then 'silver'\n            when predicted_annual_revenue_usd >= 20 then 'bronze'\n            else 'dormant'\n        end                                                             as ltv_tier\n    from ltv_computed\n)\n\nselect * from with_tiers",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["mart", "customers", "ltv", "daily"]
+    },
+
+    "model.fintech_pipeline.mart_revenue_summary": {
+      "unique_id": "model.fintech_pipeline.mart_revenue_summary",
+      "fqn": ["fintech_pipeline", "marts", "mart_revenue_summary"],
+      "database": "analytics",
+      "schema": "marts",
+      "name": "mart_revenue_summary",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/marts/mart_revenue_summary.sql",
+      "path": "marts/mart_revenue_summary.sql",
+      "alias": "mart_revenue_summary",
+      "checksum": {"name": "sha256", "checksum": "b234567890123456789012345678901234567890abcdef1234567890abcdef1234"},
+      "description": "Daily revenue summary mart. One row per date with total GTV, revenue breakdown by source (interchange, subscriptions, FX), and MoM/WoW growth rates. Powers the executive Revenue Dashboard.",
+      "columns": {
+        "report_date": {
+          "name": "report_date",
+          "description": "Primary key. Calendar date for this revenue summary row.",
+          "data_type": "date",
+          "meta": {}
+        },
+        "gross_transaction_volume_usd": {
+          "name": "gross_transaction_volume_usd",
+          "description": "Total payment volume processed across all products on this date.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "total_revenue_usd": {
+          "name": "total_revenue_usd",
+          "description": "Sum of all revenue streams: interchange + FX spread + subscription fees.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "interchange_revenue_usd": {
+          "name": "interchange_revenue_usd",
+          "description": "Revenue earned from payment interchange on this date.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "wow_gtv_growth_pct": {
+          "name": "wow_gtv_growth_pct",
+          "description": "Week-over-week GTV growth percentage vs. same day last week.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "transaction_count": {
+          "name": "transaction_count",
+          "description": "Total number of completed transactions on this date.",
+          "data_type": "integer",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "table",
+        "schema": "marts",
+        "tags": ["mart", "revenue", "daily"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.int_product_revenue"
+        ]
+      },
+      "refs": [["int_product_revenue"]],
+      "sources": [],
+      "metrics": [],
+      "raw_code": "with product_revenue as (\n    select * from {{ ref('int_product_revenue') }}\n),\n\ndaily_totals as (\n    select\n        transaction_date                                                as report_date,\n        -- NOTE: This references product_category which was removed from int_product_revenue\n        -- after the stg_products schema migration on 2024-01-10. This model has not been\n        -- updated to reflect the column removal and will fail at runtime.\n        product_category,\n        sum(transaction_count)                                          as transaction_count,\n        count(distinct product_id)                                      as active_product_count,\n        sum(gross_transaction_volume_usd)                               as gross_transaction_volume_usd,\n        sum(interchange_revenue_usd)                                    as interchange_revenue_usd,\n        sum(fx_spread_revenue_usd)                                      as fx_spread_revenue_usd,\n        sum(interchange_revenue_usd) + sum(fx_spread_revenue_usd)      as total_revenue_usd,\n        sum(decline_count)                                              as total_declines,\n        sum(chargeback_count)                                           as total_chargebacks,\n        sum(refund_volume_usd)                                          as total_refund_volume_usd\n    from product_revenue\n    group by 1, 2\n),\n\nwith_growth_rates as (\n    select\n        *,\n        -- WoW growth rate\n        (gross_transaction_volume_usd - lag(gross_transaction_volume_usd, 7)\n            over (partition by product_category order by report_date))\n        / nullif(lag(gross_transaction_volume_usd, 7)\n            over (partition by product_category order by report_date), 0) * 100\n                                                                        as wow_gtv_growth_pct,\n        -- MoM growth rate\n        (gross_transaction_volume_usd - lag(gross_transaction_volume_usd, 30)\n            over (partition by product_category order by report_date))\n        / nullif(lag(gross_transaction_volume_usd, 30)\n            over (partition by product_category order by report_date), 0) * 100\n                                                                        as mom_gtv_growth_pct\n    from daily_totals\n)\n\nselect * from with_growth_rates",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["mart", "revenue", "daily"]
+    },
+
+    "model.fintech_pipeline.mart_funnel_analysis": {
+      "unique_id": "model.fintech_pipeline.mart_funnel_analysis",
+      "fqn": ["fintech_pipeline", "marts", "mart_funnel_analysis"],
+      "database": "analytics",
+      "schema": "marts",
+      "name": "mart_funnel_analysis",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/marts/mart_funnel_analysis.sql",
+      "path": "marts/mart_funnel_analysis.sql",
+      "alias": "mart_funnel_analysis",
+      "checksum": {"name": "sha256", "checksum": "c34567890123456789012345678901234567890abcdef1234567890abcdef12345"},
+      "description": "Customer activation funnel mart. Tracks cohorts of users through the onboarding funnel (Register -> KYC -> First Transaction -> Recurring). One row per cohort_week per funnel_stage.",
+      "columns": {
+        "cohort_week": {
+          "name": "cohort_week",
+          "description": "ISO week of the customer's first session. Used for cohort grouping.",
+          "data_type": "date",
+          "meta": {}
+        },
+        "funnel_stage": {
+          "name": "funnel_stage",
+          "description": "Funnel stage name: registered, kyc_completed, card_activated, first_payment, recurring_user.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "customer_count": {
+          "name": "customer_count",
+          "description": "Number of unique customers who reached this funnel stage in this cohort.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "conversion_rate_pct": {
+          "name": "conversion_rate_pct",
+          "description": "Percentage of cohort who converted from the previous stage to this stage.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "median_days_to_stage": {
+          "name": "median_days_to_stage",
+          "description": "Median days from registration to reaching this funnel stage.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "acquisition_channel": {
+          "name": "acquisition_channel",
+          "description": "Acquisition channel segment for this cohort row.",
+          "data_type": "varchar",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "table",
+        "schema": "marts",
+        "tags": ["mart", "funnel", "growth", "weekly"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.int_user_journey"
+        ]
+      },
+      "refs": [["int_user_journey"]],
+      "sources": [],
+      "metrics": [],
+      "raw_code": "with user_journey as (\n    select * from {{ ref('int_user_journey') }}\n),\n\n-- Find when each customer first completed each funnel milestone\ncustomer_milestones as (\n    select\n        customer_id,\n        customer_segment,\n        acquisition_channel,\n        country_code,\n        min(activity_date)                                              as first_active_date,\n        date_trunc('week', min(activity_date))::date                   as cohort_week,\n        min(case when array_contains('KYC Step Completed'::varchar, key_events_completed)\n            then activity_date end)                                     as kyc_completed_date,\n        min(case when array_contains('Card Activated'::varchar, key_events_completed)\n            then activity_date end)                                     as card_activated_date,\n        min(case when did_transact then activity_date end)             as first_payment_date,\n        -- Recurring = transacted in at least 3 distinct weeks\n        case when count(distinct\n            case when did_transact then date_trunc('week', activity_date) end) >= 3\n        then min(\n            case when did_transact then activity_date end\n        ) end                                                           as recurring_user_date\n    from user_journey\n    group by 1, 2, 3, 4\n),\n\n-- Pivot to funnel stage grain using UNION ALL\nfunnel_stages as (\n    select customer_id, acquisition_channel, cohort_week,\n        'registered' as funnel_stage, first_active_date as stage_date\n    from customer_milestones\n    where first_active_date is not null\n\n    union all\n    select customer_id, acquisition_channel, cohort_week,\n        'kyc_completed' as funnel_stage, kyc_completed_date as stage_date\n    from customer_milestones\n    where kyc_completed_date is not null\n\n    union all\n    select customer_id, acquisition_channel, cohort_week,\n        'card_activated' as funnel_stage, card_activated_date as stage_date\n    from customer_milestones\n    where card_activated_date is not null\n\n    union all\n    select customer_id, acquisition_channel, cohort_week,\n        'first_payment' as funnel_stage, first_payment_date as stage_date\n    from customer_milestones\n    where first_payment_date is not null\n\n    union all\n    select customer_id, acquisition_channel, cohort_week,\n        'recurring_user' as funnel_stage, recurring_user_date as stage_date\n    from customer_milestones\n    where recurring_user_date is not null\n),\n\naggregated as (\n    select\n        cohort_week,\n        acquisition_channel,\n        funnel_stage,\n        count(distinct customer_id)                                     as customer_count,\n        median(datediff('day', cohort_week, stage_date))                as median_days_to_stage\n    from funnel_stages\n    group by 1, 2, 3\n),\n\n-- Add conversion rate vs previous stage\nordered_stages as (\n    select\n        cohort_week,\n        acquisition_channel,\n        funnel_stage,\n        customer_count,\n        median_days_to_stage,\n        first_value(customer_count) over (\n            partition by cohort_week, acquisition_channel\n            order by median_days_to_stage\n        )                                                               as cohort_total,\n        customer_count / nullif(lag(customer_count) over (\n            partition by cohort_week, acquisition_channel\n            order by median_days_to_stage\n        ), 0) * 100                                                     as conversion_rate_pct\n    from aggregated\n)\n\nselect * from ordered_stages",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["mart", "funnel", "growth", "weekly"]
+    },
+
+    "model.fintech_pipeline.mart_daily_metrics": {
+      "unique_id": "model.fintech_pipeline.mart_daily_metrics",
+      "fqn": ["fintech_pipeline", "marts", "mart_daily_metrics"],
+      "database": "analytics",
+      "schema": "marts",
+      "name": "mart_daily_metrics",
+      "resource_type": "model",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/marts/mart_daily_metrics.sql",
+      "path": "marts/mart_daily_metrics.sql",
+      "alias": "mart_daily_metrics",
+      "checksum": {"name": "sha256", "checksum": "d456789012345678901234567890123456789012345678901234567890abcdef12"},
+      "description": "Daily business metrics rollup for the Growth Dashboard. One row per date with DAU, transaction metrics, revenue KPIs, and activation counts. Source of truth for the executive daily metrics email.",
+      "columns": {
+        "metric_date": {
+          "name": "metric_date",
+          "description": "Primary key. Calendar date for this metrics row.",
+          "data_type": "date",
+          "meta": {}
+        },
+        "daily_active_customers": {
+          "name": "daily_active_customers",
+          "description": "Distinct customers who completed at least one transaction on this date.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "daily_transaction_count": {
+          "name": "daily_transaction_count",
+          "description": "Total completed transactions on this date.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "daily_gtv_usd": {
+          "name": "daily_gtv_usd",
+          "description": "Gross transaction volume on this date in USD.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "new_transacting_customers": {
+          "name": "new_transacting_customers",
+          "description": "Customers who completed their first-ever transaction on this date.",
+          "data_type": "integer",
+          "meta": {}
+        },
+        "daily_revenue_usd": {
+          "name": "daily_revenue_usd",
+          "description": "Total revenue (interchange + FX + fees) on this date.",
+          "data_type": "numeric",
+          "meta": {}
+        }
+      },
+      "config": {
+        "materialized": "table",
+        "schema": "marts",
+        "tags": ["mart", "metrics", "daily"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.int_customer_transactions",
+          "model.fintech_pipeline.int_product_revenue"
+        ]
+      },
+      "refs": [["int_customer_transactions"], ["int_product_revenue"]],
+      "sources": [],
+      "metrics": [],
+      "raw_code": "with customer_transactions as (\n    select * from {{ ref('int_customer_transactions') }}\n),\n\nproduct_revenue as (\n    select * from {{ ref('int_product_revenue') }}\n),\n\n-- Daily customer activity\ndaily_customers as (\n    select\n        transacted_at::date                                             as metric_date,\n        count(distinct customer_id)                                     as daily_active_customers,\n        count(transaction_id)                                           as daily_transaction_count,\n        sum(amount_usd)                                                 as daily_gtv_usd,\n        count(distinct case when customer_transaction_sequence = 1\n            then customer_id end)                                       as new_transacting_customers,\n        count(distinct case when customer_transaction_sequence = 1\n            and customer_segment = 'sme'\n            then customer_id end)                                       as new_sme_customers,\n        avg(amount_usd)                                                 as avg_transaction_value_usd,\n        percentile_cont(0.5) within group (order by amount_usd)        as median_transaction_value_usd\n    from customer_transactions\n    group by 1\n),\n\n-- Daily revenue\ndaily_revenue as (\n    select\n        transaction_date                                                as metric_date,\n        sum(interchange_revenue_usd)                                    as daily_interchange_revenue_usd,\n        sum(fx_spread_revenue_usd)                                      as daily_fx_revenue_usd,\n        sum(interchange_revenue_usd) + sum(fx_spread_revenue_usd)      as daily_revenue_usd,\n        sum(gross_transaction_volume_usd)                               as daily_gtv_from_revenue_model\n    from product_revenue\n    group by 1\n),\n\ncombined as (\n    select\n        dc.metric_date,\n        dc.daily_active_customers,\n        dc.daily_transaction_count,\n        dc.daily_gtv_usd,\n        dc.new_transacting_customers,\n        dc.new_sme_customers,\n        dc.avg_transaction_value_usd,\n        dc.median_transaction_value_usd,\n        dr.daily_interchange_revenue_usd,\n        dr.daily_fx_revenue_usd,\n        dr.daily_revenue_usd,\n        -- 7-day rolling averages\n        avg(dc.daily_active_customers) over (\n            order by dc.metric_date\n            rows between 6 preceding and current row\n        )                                                               as rolling_7d_dau,\n        avg(dc.daily_gtv_usd) over (\n            order by dc.metric_date\n            rows between 6 preceding and current row\n        )                                                               as rolling_7d_gtv_usd\n    from daily_customers dc\n    left join daily_revenue dr on dc.metric_date = dr.metric_date\n)\n\nselect * from combined",
+      "compiled_code": null,
+      "meta": {},
+      "tags": ["mart", "metrics", "daily"]
+    }
+  },
+
+  "sources": {
+    "source.fintech_pipeline.raw.raw_transactions": {
+      "unique_id": "source.fintech_pipeline.raw.raw_transactions",
+      "fqn": ["fintech_pipeline", "raw", "raw_transactions"],
+      "database": "raw_db",
+      "schema": "raw",
+      "name": "raw_transactions",
+      "resource_type": "source",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/sources.yml",
+      "path": "staging/sources.yml",
+      "source_name": "raw",
+      "source_description": "Raw data from the Fivetran payment processor connector (Stripe + Adyen).",
+      "identifier": "raw_transactions",
+      "loader": "fivetran",
+      "description": "Raw payment transaction records from the payments processing layer. Includes all attempted transactions (authorized, declined, refunded). Loaded via Fivetran from Stripe webhook events every 15 minutes.",
+      "columns": {
+        "transaction_id": {
+          "name": "transaction_id",
+          "description": "Unique transaction identifier from the payment processor.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Internal customer identifier.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "amount": {
+          "name": "amount",
+          "description": "Transaction amount in original currency.",
+          "data_type": "numeric",
+          "meta": {}
+        },
+        "currency_code": {
+          "name": "currency_code",
+          "description": "ISO 4217 three-letter currency code.",
+          "data_type": "varchar",
+          "meta": {}
+        }
+      },
+      "config": {
+        "enabled": true,
+        "schema": "raw",
+        "tags": ["raw", "transactions"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": []
+      },
+      "tags": ["raw", "transactions"],
+      "meta": {}
+    },
+
+    "source.fintech_pipeline.raw.raw_customers": {
+      "unique_id": "source.fintech_pipeline.raw.raw_customers",
+      "fqn": ["fintech_pipeline", "raw", "raw_customers"],
+      "database": "raw_db",
+      "schema": "raw",
+      "name": "raw_customers",
+      "resource_type": "source",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/sources.yml",
+      "path": "staging/sources.yml",
+      "source_name": "raw",
+      "source_description": "Raw data from the Fivetran payment processor connector (Stripe + Adyen).",
+      "identifier": "raw_customers",
+      "loader": "fivetran",
+      "description": "Raw customer profile records from the CRM (Salesforce). Includes all customer fields including PII. Loaded via Fivetran every 4 hours.",
+      "columns": {
+        "customer_id": {
+          "name": "customer_id",
+          "description": "Unique customer identifier from CRM.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "email": {
+          "name": "email",
+          "description": "Customer email address. PII — must be hashed before analytics use.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "full_name": {
+          "name": "full_name",
+          "description": "Customer full name. PII — must be hashed before analytics use.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "customer_segment": {
+          "name": "customer_segment",
+          "description": "CRM customer segment classification.",
+          "data_type": "varchar",
+          "meta": {}
+        }
+      },
+      "config": {
+        "enabled": true,
+        "schema": "raw",
+        "tags": ["raw", "customers", "pii"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": []
+      },
+      "tags": ["raw", "customers", "pii"],
+      "meta": {}
+    },
+
+    "source.fintech_pipeline.raw.raw_products": {
+      "unique_id": "source.fintech_pipeline.raw.raw_products",
+      "fqn": ["fintech_pipeline", "raw", "raw_products"],
+      "database": "raw_db",
+      "schema": "raw",
+      "name": "raw_products",
+      "resource_type": "source",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/sources.yml",
+      "path": "staging/sources.yml",
+      "source_name": "raw",
+      "source_description": "Raw data from the Fivetran payment processor connector (Stripe + Adyen).",
+      "identifier": "raw_products",
+      "loader": "fivetran",
+      "description": "Raw product catalog from the core banking system (Mambu). Updated nightly via Fivetran. Includes product configuration, pricing, and feature flags.",
+      "columns": {
+        "product_id": {
+          "name": "product_id",
+          "description": "Unique product identifier from core banking.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "product_name": {
+          "name": "product_name",
+          "description": "Product display name.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "product_category": {
+          "name": "product_category",
+          "description": "Product category. NOTE: This column was deprecated in the v2 schema migration on 2024-01-10.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "product_type": {
+          "name": "product_type",
+          "description": "Product type classification.",
+          "data_type": "varchar",
+          "meta": {}
+        }
+      },
+      "config": {
+        "enabled": true,
+        "schema": "raw",
+        "tags": ["raw", "products"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": []
+      },
+      "tags": ["raw", "products"],
+      "meta": {}
+    },
+
+    "source.fintech_pipeline.raw.raw_events": {
+      "unique_id": "source.fintech_pipeline.raw.raw_events",
+      "fqn": ["fintech_pipeline", "raw", "raw_events"],
+      "database": "raw_db",
+      "schema": "raw",
+      "name": "raw_events",
+      "resource_type": "source",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/sources.yml",
+      "path": "staging/sources.yml",
+      "source_name": "raw",
+      "source_description": "Raw data from the Fivetran payment processor connector (Stripe + Adyen).",
+      "identifier": "raw_events",
+      "loader": "segment",
+      "description": "Raw user behavior events from Segment (mobile and web). Track calls with event properties stored as JSONB. Loaded via Segment dbt integration in near real-time.",
+      "columns": {
+        "event_id": {
+          "name": "event_id",
+          "description": "Unique event identifier from Segment.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "user_id": {
+          "name": "user_id",
+          "description": "Authenticated user ID (maps to customer_id). NULL for pre-auth events.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "anonymous_id": {
+          "name": "anonymous_id",
+          "description": "Segment anonymous ID for pre-authentication tracking.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "event_name": {
+          "name": "event_name",
+          "description": "Segment track event name.",
+          "data_type": "varchar",
+          "meta": {}
+        }
+      },
+      "config": {
+        "enabled": true,
+        "schema": "raw",
+        "tags": ["raw", "events", "segment"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": []
+      },
+      "tags": ["raw", "events", "segment"],
+      "meta": {}
+    },
+
+    "source.fintech_pipeline.raw.raw_sessions": {
+      "unique_id": "source.fintech_pipeline.raw.raw_sessions",
+      "fqn": ["fintech_pipeline", "raw", "raw_sessions"],
+      "database": "raw_db",
+      "schema": "raw",
+      "name": "raw_sessions",
+      "resource_type": "source",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/staging/sources.yml",
+      "path": "staging/sources.yml",
+      "source_name": "raw",
+      "source_description": "Raw data from the Fivetran payment processor connector (Stripe + Adyen).",
+      "identifier": "raw_sessions",
+      "loader": "segment",
+      "description": "Raw session data from Segment session tracking. Each record is one user session with pre-aggregated page view and event counts. Loaded via Segment every hour.",
+      "columns": {
+        "session_id": {
+          "name": "session_id",
+          "description": "Unique session identifier.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "anonymous_id": {
+          "name": "anonymous_id",
+          "description": "Segment anonymous ID.",
+          "data_type": "varchar",
+          "meta": {}
+        },
+        "session_started_at": {
+          "name": "session_started_at",
+          "description": "Session start timestamp.",
+          "data_type": "timestamp",
+          "meta": {}
+        },
+        "session_duration_seconds": {
+          "name": "session_duration_seconds",
+          "description": "Total session duration in seconds.",
+          "data_type": "integer",
+          "meta": {}
+        }
+      },
+      "config": {
+        "enabled": true,
+        "schema": "raw",
+        "tags": ["raw", "sessions", "segment"],
+        "meta": {}
+      },
+      "depends_on": {
+        "macros": [],
+        "nodes": []
+      },
+      "tags": ["raw", "sessions", "segment"],
+      "meta": {}
+    }
+  },
+
+  "exposures": {
+    "exposure.fintech_pipeline.revenue_dashboard": {
+      "unique_id": "exposure.fintech_pipeline.revenue_dashboard",
+      "fqn": ["fintech_pipeline", "revenue_dashboard"],
+      "name": "revenue_dashboard",
+      "resource_type": "exposure",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/marts/exposures.yml",
+      "path": "marts/exposures.yml",
+      "description": "Looker Studio revenue dashboard used by the CFO and Finance team daily. Shows daily/weekly/monthly GTV, revenue breakdown by product category, and top customer segments by LTV. Refreshes at 7am UTC.",
+      "type": "dashboard",
+      "owner": {
+        "name": "Priya Chandrasekaran",
+        "email": "priya@fintech-corp.com"
+      },
+      "url": "https://lookerstudio.google.com/reporting/abc123/revenue",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.mart_revenue_summary",
+          "model.fintech_pipeline.mart_customer_ltv"
+        ]
+      },
+      "refs": [["mart_revenue_summary"], ["mart_customer_ltv"]],
+      "sources": [],
+      "tags": ["dashboard", "finance", "executive"],
+      "meta": {}
+    },
+
+    "exposure.fintech_pipeline.growth_dashboard": {
+      "unique_id": "exposure.fintech_pipeline.growth_dashboard",
+      "fqn": ["fintech_pipeline", "growth_dashboard"],
+      "name": "growth_dashboard",
+      "resource_type": "exposure",
+      "package_name": "fintech_pipeline",
+      "original_file_path": "models/marts/exposures.yml",
+      "path": "marts/exposures.yml",
+      "description": "Amplitude-style growth analytics dashboard used by the Growth and Product teams. Shows acquisition funnel conversion rates by channel and cohort, DAU/WAU/MAU, and activation milestones. Refreshes every 6 hours.",
+      "type": "dashboard",
+      "owner": {
+        "name": "Marcus Johnson",
+        "email": "marcus@fintech-corp.com"
+      },
+      "url": "https://lookerstudio.google.com/reporting/def456/growth",
+      "depends_on": {
+        "macros": [],
+        "nodes": [
+          "model.fintech_pipeline.mart_funnel_analysis",
+          "model.fintech_pipeline.mart_daily_metrics"
+        ]
+      },
+      "refs": [["mart_funnel_analysis"], ["mart_daily_metrics"]],
+      "sources": [],
+      "tags": ["dashboard", "growth", "product"],
+      "meta": {}
+    }
+  },
+
+  "metrics": {},
+  "groups": {},
+  "selectors": {},
+  "docs": {},
+  "parent_map": {
+    "model.fintech_pipeline.stg_transactions": ["source.fintech_pipeline.raw.raw_transactions"],
+    "model.fintech_pipeline.stg_customers": ["source.fintech_pipeline.raw.raw_customers"],
+    "model.fintech_pipeline.stg_products": ["source.fintech_pipeline.raw.raw_products"],
+    "model.fintech_pipeline.stg_events": ["source.fintech_pipeline.raw.raw_events"],
+    "model.fintech_pipeline.stg_sessions": ["source.fintech_pipeline.raw.raw_sessions"],
+    "model.fintech_pipeline.int_customer_transactions": [
+      "model.fintech_pipeline.stg_transactions",
+      "model.fintech_pipeline.stg_customers"
+    ],
+    "model.fintech_pipeline.int_product_revenue": [
+      "model.fintech_pipeline.stg_transactions",
+      "model.fintech_pipeline.stg_products"
+    ],
+    "model.fintech_pipeline.int_user_journey": [
+      "model.fintech_pipeline.stg_events",
+      "model.fintech_pipeline.stg_sessions",
+      "model.fintech_pipeline.stg_customers"
+    ],
+    "model.fintech_pipeline.mart_customer_ltv": [
+      "model.fintech_pipeline.int_customer_transactions",
+      "model.fintech_pipeline.stg_customers"
+    ],
+    "model.fintech_pipeline.mart_revenue_summary": [
+      "model.fintech_pipeline.int_product_revenue"
+    ],
+    "model.fintech_pipeline.mart_funnel_analysis": [
+      "model.fintech_pipeline.int_user_journey"
+    ],
+    "model.fintech_pipeline.mart_daily_metrics": [
+      "model.fintech_pipeline.int_customer_transactions",
+      "model.fintech_pipeline.int_product_revenue"
+    ],
+    "exposure.fintech_pipeline.revenue_dashboard": [
+      "model.fintech_pipeline.mart_revenue_summary",
+      "model.fintech_pipeline.mart_customer_ltv"
+    ],
+    "exposure.fintech_pipeline.growth_dashboard": [
+      "model.fintech_pipeline.mart_funnel_analysis",
+      "model.fintech_pipeline.mart_daily_metrics"
+    ]
+  },
+  "child_map": {
+    "source.fintech_pipeline.raw.raw_transactions": ["model.fintech_pipeline.stg_transactions"],
+    "source.fintech_pipeline.raw.raw_customers": ["model.fintech_pipeline.stg_customers"],
+    "source.fintech_pipeline.raw.raw_products": ["model.fintech_pipeline.stg_products"],
+    "source.fintech_pipeline.raw.raw_events": ["model.fintech_pipeline.stg_events"],
+    "source.fintech_pipeline.raw.raw_sessions": ["model.fintech_pipeline.stg_sessions"],
+    "model.fintech_pipeline.stg_transactions": [
+      "model.fintech_pipeline.int_customer_transactions",
+      "model.fintech_pipeline.int_product_revenue"
+    ],
+    "model.fintech_pipeline.stg_customers": [
+      "model.fintech_pipeline.int_customer_transactions",
+      "model.fintech_pipeline.int_user_journey"
+    ],
+    "model.fintech_pipeline.stg_products": ["model.fintech_pipeline.int_product_revenue"],
+    "model.fintech_pipeline.stg_events": ["model.fintech_pipeline.int_user_journey"],
+    "model.fintech_pipeline.stg_sessions": ["model.fintech_pipeline.int_user_journey"],
+    "model.fintech_pipeline.int_customer_transactions": [
+      "model.fintech_pipeline.mart_customer_ltv",
+      "model.fintech_pipeline.mart_daily_metrics"
+    ],
+    "model.fintech_pipeline.int_product_revenue": [
+      "model.fintech_pipeline.mart_revenue_summary",
+      "model.fintech_pipeline.mart_daily_metrics"
+    ],
+    "model.fintech_pipeline.int_user_journey": ["model.fintech_pipeline.mart_funnel_analysis"],
+    "model.fintech_pipeline.mart_customer_ltv": ["exposure.fintech_pipeline.revenue_dashboard"],
+    "model.fintech_pipeline.mart_revenue_summary": ["exposure.fintech_pipeline.revenue_dashboard"],
+    "model.fintech_pipeline.mart_funnel_analysis": ["exposure.fintech_pipeline.growth_dashboard"],
+    "model.fintech_pipeline.mart_daily_metrics": ["exposure.fintech_pipeline.growth_dashboard"]
+  }
+}

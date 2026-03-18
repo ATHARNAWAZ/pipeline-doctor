@@ -1,0 +1,1 @@
+export { ModelDetail } from './ModelDetail';
