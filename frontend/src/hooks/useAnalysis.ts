@@ -63,6 +63,8 @@ function buildGraphData(cytoscape: CytoscapeGraph): GraphData {
   return { nodes, edges };
 }
 
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
+
 export function useAnalysis() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export function useAnalysis() {
         // correct multipart boundary when given a FormData object. Overriding it
         // strips the boundary and breaks the server's multipart parser.
         const analysisResponse = await axios.post<AnalysisResult>(
-          '/api/analyze',
+          `${API_BASE}/analyze`,
           formData
         );
 
@@ -101,7 +103,7 @@ export function useAnalysis() {
         setAnalysisId(result.analysis_id);
 
         // Fetch the full graph for visualization
-        const graphResponse = await axios.get<CytoscapeGraph>('/api/lineage');
+        const graphResponse = await axios.get<CytoscapeGraph>(`${API_BASE}/lineage`);
         const graphData = buildGraphData(graphResponse.data);
 
         // Node status and error_message are embedded in node data by the backend
@@ -148,7 +150,7 @@ export function useAnalysis() {
         setGraphData({ nodes: annotatedNodes, edges: graphData.edges });
 
         // Fetch pipeline status
-        const statusResponse = await axios.get('/api/analyze/status');
+        const statusResponse = await axios.get(`${API_BASE}/analyze/status`);
         setPipelineStatus(statusResponse.data);
       } catch (err: unknown) {
         if (axios.isAxiosError(err)) {

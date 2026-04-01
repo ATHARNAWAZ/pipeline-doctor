@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import type { ChatMessage } from '../types';
 
-// Route WebSocket through the Vite proxy (/ws prefix → backend /query/stream).
-// Using window.location.host preserves the port so this works on any dev port.
-// In production (deployed behind nginx/ALB), the same relative path works.
+// In production set VITE_WS_URL to point directly at the backend WebSocket
+// (e.g. wss://your-backend.onrender.com/query/stream).
+// In dev, fall back to the Vite proxy path so no env var is needed locally.
 const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_URL = `${WS_PROTOCOL}//${window.location.host}/ws/query/stream`;
+const WS_URL =
+  import.meta.env.VITE_WS_URL ??
+  `${WS_PROTOCOL}//${window.location.host}/ws/query/stream`;
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 30000;
 const MAX_RECONNECT_ATTEMPTS = 5;

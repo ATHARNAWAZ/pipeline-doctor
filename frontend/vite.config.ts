@@ -5,15 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      // REST endpoints: /api/analyze, /api/lineage, /api/query/ask, /api/health
-      '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-      // WebSocket endpoint: proxied separately so Vite upgrades the connection
+      // REST endpoints — proxy directly to backend (no prefix stripping needed)
+      '/analyze': { target: 'http://localhost:8000', changeOrigin: true },
+      '/lineage': { target: 'http://localhost:8000', changeOrigin: true },
+      '/health': { target: 'http://localhost:8000', changeOrigin: true },
+      // WebSocket: /ws/query/stream → backend /query/stream
       '/ws': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         ws: true,
         rewrite: (path) => path.replace(/^\/ws/, ''),

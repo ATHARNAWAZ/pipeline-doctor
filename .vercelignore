@@ -1,0 +1,4 @@
+backend/
+infra/
+sample_data/
+docker-compose.yml
