@@ -20,7 +20,7 @@ const EMPTY_STATE_TEXT =
 export function ChatPanel() {
   const { messages, isStreaming, clearMessages } = useChatStore();
   const { analysisId } = usePipelineStore();
-  const { sendMessage } = useStreamingChat();
+  const { sendMessage } = useStreamingChat(analysisId);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);

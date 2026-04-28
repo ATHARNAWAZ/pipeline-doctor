@@ -4,14 +4,16 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true, // Necessary to allow external access to the container
     proxy: {
-      // REST endpoints — proxy directly to backend (no prefix stripping needed)
-      '/analyze': { target: 'http://localhost:8000', changeOrigin: true },
-      '/lineage': { target: 'http://localhost:8000', changeOrigin: true },
-      '/health': { target: 'http://localhost:8000', changeOrigin: true },
-      // WebSocket: /ws/query/stream → backend /query/stream
+      // Proxy to the 'backend' service name, NOT 'localhost'
+      '/analyze': { target: 'http://backend:8000', changeOrigin: true },
+      '/lineage': { target: 'http://backend:8000', changeOrigin: true },
+      '/health': { target: 'http://backend:8000', changeOrigin: true },
+      '/query': { target: 'http://backend:8000', changeOrigin: true },
+      
       '/ws': {
-        target: 'http://localhost:8000',
+        target: 'ws://backend:8000', // Use ws:// for WebSocket targets
         changeOrigin: true,
         ws: true,
         rewrite: (path) => path.replace(/^\/ws/, ''),

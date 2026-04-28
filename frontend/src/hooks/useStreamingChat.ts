@@ -23,7 +23,7 @@ function generateId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export function useStreamingChat() {
+export function useStreamingChat(analysisId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,7 +124,10 @@ export function useStreamingChat() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    connect();
+    // Only connect once an analysis exists — avoids noisy connection errors on initial load
+    if (analysisId) {
+      connect();
+    }
 
     return () => {
       isMountedRef.current = false;
@@ -135,7 +138,7 @@ export function useStreamingChat() {
         wsRef.current = null;
       }
     };
-  }, [connect, clearReconnectTimer]);
+  }, [analysisId, connect, clearReconnectTimer]);
 
   const sendMessage = useCallback(
     (question: string, analysisId: string | null) => {

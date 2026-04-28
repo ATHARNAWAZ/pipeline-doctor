@@ -7,6 +7,7 @@ llama-index-embeddings-openai==0.1.6
 llama-index-embeddings-huggingface==0.2.0
 pgvector==0.2.5
 psycopg2-binary==2.9.9
+asyncpg==0.29.0
 sqlalchemy==2.0.27
 networkx==3.2.1
 pydantic==2.6.1

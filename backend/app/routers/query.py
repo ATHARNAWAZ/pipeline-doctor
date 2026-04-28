@@ -142,14 +142,13 @@ async def ask_question(
     }
 
     try:
-        answer = await claude_service.stream_response(
+        # stream_response is an async generator — iterate it directly (no await)
+        chunks = []
+        async for chunk in claude_service.stream_response(
             question=request.question,
             context=context,
             manifest_summary=manifest_summary,
-        )
-        # stream_response is an async generator — collect it for the sync endpoint
-        chunks = []
-        async for chunk in answer:
+        ):
             chunks.append(chunk)
         full_answer = "".join(chunks)
     except RuntimeError as exc:

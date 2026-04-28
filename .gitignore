@@ -66,3 +66,5 @@ lambda_package/
 
 # Sample data (don't commit real manifests)
 # sample_data/ is committed as it's demo data
+
+.vercel
